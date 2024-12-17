@@ -11,10 +11,25 @@ from PIL import Image , ImageTk
 import os
 import google.generativeai as genai
 import  re
+import socket
 # Initialisation de la reconnaissance vocale et de la synthèse vocale
 recognizer = sr.Recognizer()
 engine = pyttsx3.init()
 
+
+def send_command_to_esp8266(command):
+    esp_ip = "192.168.154.57"  # Remplacez par l'adresse IP du ESP8266
+    port = 80
+    try:
+        # Connexion au ESP8266
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((esp_ip, port))
+            s.sendall(command.encode())  # Envoi de la commande
+            response = s.recv(1024).decode()  # Réception de la réponse
+            return response
+    except Exception as e:
+        print(f"Erreur : {e}")
+        return None
 def create_response(question):
   genai.configure(api_key="AIzaSyCJRd4Wv2PHkVK5DFrj9FjehR4j8Ezv2eY")
 
@@ -104,7 +119,7 @@ def google_search(query):
         if results:
             url = results[0]
             speak(f"Voici ce que j'ai trouvé pour {query}.")
-            print(f"Premier résultat : {url}")
+            speak(f"consulter la Premier résultat : {url}")
 
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -176,7 +191,35 @@ def execute_command():
                         speak("Je n'ai pas pu générer une réponse.")
             except Exception as e:
                     print(f"Erreur lors de la génération de la réponse : {e}")
+
                     speak("Désolé, une erreur est survenue.")
+    elif "lire humidité" in command:
+        # Connect to Arduino to read humidity
+        try:
+            humidity = send_command_to_esp8266("READ_SOIL_HUMIDITY")
+            speak(f"L'humidité actuelle est de {humidity} %")
+        except Exception as e:
+            speak("Impossible de communiquer avec Arduino. Vérifiez la connexion.")
+            print(f"Erreur : {e}")
+    elif "arrêter relais" in command or "stop pompe" in command:
+            try:
+                response = send_command_to_esp8266("PUMP_OFF")
+                speak(response)
+            except Exception as e:
+                speak("Impossible de communiquer avec Arduino. Vérifiez la connexion.")
+                print(f"Erreur : {e}")
+    elif "arrosage" in command:
+        # Connect to Arduino to activate the pump
+        try:
+            response = send_command_to_esp8266("PUMP_ON")
+
+            speak(response)
+
+
+        except Exception as e:
+            speak("Impossible de communiquer avec Arduino. Vérifiez la connexion.")
+            print(f"Erreur : {e}")
+
 
     elif "ferme" in command:
             speak("Fermeture de l'application.")
@@ -189,7 +232,7 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
 app = ctk.CTk()
-app.title("Assistant Vocal by Hind, Nour et Balkis")
+app.title("Assistant Vocal by Hind, Nour et Balkiss")
 app.geometry("1000x600")
 # Label d'instructions
 #ajouter l'imade de l'arriére plan
@@ -201,17 +244,17 @@ label = ctk.CTkLabel(master=i, text="Cliquez sur le bouton pour écouter une com
 label.place(x=350,y=30)
 #ajouter l'mage de jannet
 image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "python jannet.png")
-image= ctk.CTkImage(light_image=Image.open(image_path),size=(300,180))
+image= ctk.CTkImage(light_image=Image.open(image_path),size=(200,100))
 image_label = ctk.CTkLabel(master=i,image= image,text='')
 image_label.place(x=0,y=410)
 #crée une partie pour faire apparaite le text liser par jannet
-output_textbox = ctk.CTkTextbox(master=i, height=100, width=800, font=("Arial", 25), wrap="word",border_width=5, border_color="pale Turquoise",text_color="moccasin")
-output_textbox.place(x=150,y=250)
+output_textbox = ctk.CTkTextbox(master=i, height=250, width=800, font=("Arial", 25), wrap="word",border_width=5, border_color="pale Turquoise",text_color="moccasin")
+output_textbox.place(x=150,y=200)
 # Bouton pour écouter une commande
 ecoute_bouton = ctk.CTkButton(
     master=i, text="Ready to hear", command=execute_command, font=("Helvetica", 15), height=70, width=250, fg_color="olive"
 )
-ecoute_bouton.place(x=450,y=120)
+ecoute_bouton.place(x=450,y=90)
 
 # Bouton pour quitter l'application
 exit_bouton = ctk.CTkButton(
@@ -221,3 +264,4 @@ exit_bouton.place(x=750,y=500)
 
 # Lancement de l'application
 app.mainloop()
+
